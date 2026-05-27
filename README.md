@@ -23,6 +23,11 @@ An interactive 3D space simulation built using **Three.js (WebGL)** to visualize
 8. GEO (Geostationary Orbit)
 9. Luna (The Moon)
 
+<video width="100%" controls autoplay muted loop>
+  <source src="https://github.com/Mobinravan/Geodetic-Satellite-Simulation/raw/refs/heads/main/assets/demo.mp4" type="video/mp4">
+  Your browser does not support the video tag.
+</video>
+
 ##  How to Run Locally
 1. Clone this repository:
    ```bash
