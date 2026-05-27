@@ -1,6 +1,11 @@
+
 # 3D Geodetic Satellite Orbit Simulation
 
 An interactive 3D space simulation built using **Three.js (WebGL)** to visualize different satellite orbits around the Earth.
+
+## 🎥 Demo Video
+
+[![Watch the demo](https://img.shields.io/badge/🎬-Watch_Demo_Video-red?style=for-the-badge)](https://github.com/Mobinravan/Geodetic-Satellite-Simulation/raw/refs/heads/main/assets/demo.mp4)
 
 ##  Developer
 - **Mobin Ravan**
@@ -22,11 +27,6 @@ An interactive 3D space simulation built using **Three.js (WebGL)** to visualize
 7. GPS Constellation
 8. GEO (Geostationary Orbit)
 9. Luna (The Moon)
-
-<video width="100%" controls autoplay muted loop>
-  <source src="https://github.com/Mobinravan/Geodetic-Satellite-Simulation/raw/refs/heads/main/assets/demo.mp4" type="video/mp4">
-  Your browser does not support the video tag.
-</video>
 
 ##  How to Run Locally
 1. Clone this repository:
