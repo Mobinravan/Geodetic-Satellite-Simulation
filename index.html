@@ -1,0 +1,423 @@
+# Mobin Ravan
+# PHOBOS 
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advanced 3D Geodetic Satellite Control Orbit Simulation</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #020204;
+            font-family: 'Courier New', Courier, monospace;
+        }
+        #canvas-container {
+            width: 100vw;
+            height: 100vh;
+        }
+        
+        #title-container {
+            position: absolute;
+            top: 25px;
+            left: 25px;
+            color: #ffffff;
+            pointer-events: none;
+            background: rgba(4, 8, 16, 0.6);
+            padding: 15px;
+            border-left: 3px solid #00ffff;
+            border-radius: 0 8px 8px 0;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+        }
+        h1 { margin: 0; font-size: 20px; font-weight: bold; letter-spacing: 2px; color: #00ffff; text-transform: uppercase; }
+        h2 { margin: 5px 0 0 0; font-size: 11px; color: #8ab4f8; font-weight: bold; letter-spacing: 1px; }
+        
+        #tooltip {
+            position: absolute;
+            display: none;
+            background: rgba(5, 10, 20, 0.9);
+            border: 1px solid rgba(0, 255, 255, 0.5);
+            box-sizing: border-box;
+            box-shadow: 0 0 25px rgba(0, 255, 255, 0.3);
+            border-radius: 6px;
+            padding: 16px;
+            color: #fff;
+            pointer-events: none;
+            font-size: 12px;
+            min-width: 260px;
+            backdrop-filter: blur(8px);
+            z-index: 10;
+        }
+        #tooltip h3 {
+            margin: 0 0 12px 0;
+            font-size: 15px;
+            border-bottom: 2px dashed rgba(0,255,255,0.3);
+            padding-bottom: 6px;
+            color: #00ffff;
+            letter-spacing: 1px;
+        }
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 6px 0;
+        }
+        .info-label { color: #8899a6; }
+        .info-value { font-weight: bold; color: #e1e8ed; }
+        
+        #controls-panel {
+            position: absolute;
+            bottom: 25px;
+            right: 25px;
+            background: rgba(5, 10, 20, 0.85);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 6px;
+            padding: 18px;
+            color: #fff;
+            font-size: 12px;
+            min-width: 220px;
+            backdrop-filter: blur(8px);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+        .panel-header {
+            font-weight: bold;
+            color: #8ab4f8;
+            letter-spacing: 1px;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+        }
+        .slider-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 8px;
+        }
+        input[type=range] {
+            flex-grow: 1;
+            background: #223344;
+            accent-color: #00ffff;
+        }
+        #speed-indicator {
+            margin-top: 8px;
+            color: #00ffff;
+            font-weight: bold;
+            font-size: 11px;
+        }
+        
+        #instructions {
+            position: absolute;
+            bottom: 25px;
+            left: 25px;
+            color: #8899a6;
+            font-size: 11px;
+            background: rgba(4, 8, 16, 0.7);
+            padding: 12px 16px;
+            border-radius: 6px;
+            pointer-events: none;
+            line-height: 1.6;
+            border: 1px solid rgba(255,255,255,0.05);
+        }
+        .highlight { color: #00ffff; font-weight: bold; }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+</head>
+<body>
+
+    <div id="title-container">
+        <h1>Geodetic Orbit Lab </h1>
+        <h2>Telemetry Deck</h2>
+    </div>
+
+    <div id="tooltip">
+        <h3 id="meta-name">Satellite Telemetry</h3>
+        <div class="info-row"><span class="info-label">Orbit Radius (r):</span><span class="info-value" id="meta-radius">-</span></div>
+        <div class="info-row"><span class="info-label">Altitude (h):</span><span class="info-value" id="meta-altitude">-</span></div>
+        <div class="info-row"><span class="info-label">Orbital Velocity:</span><span class="info-value" id="meta-velocity">-</span></div>
+        <div class="info-row"><span class="info-label">Nodal Period (U):</span><span class="info-value" id="meta-period">-</span></div>
+    </div>
+
+    <div id="instructions">
+        <span class="highlight">NAVIGATION:</span> Left Click + Drag to Orbit Camera | Scroll to Zoom<br>
+    </div>
+
+    <div id="controls-panel">
+        <div class="panel-header">Warp Factor (Time-Scale)</div>
+        <div class="slider-container">
+            <span>1x</span>
+            <input type="range" id="timeScaleSlider" min="1" max="5000" value="1500">
+            <span>5000x</span>
+        </div>
+        <div id="speed-indicator">Warp Speed: 1500x real-time</div>
+    </div>
+
+    <div id="canvas-container"></div>
+
+    <script>
+        // --- 1. SCENE SETUP ---
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        scene.fog = new THREE.FogExp2(0x020204, 0.008);
+
+        const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 1500);
+        camera.position.set(30, 45, 75);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        container.appendChild(renderer.domElement);
+
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.maxDistance = 350;
+        controls.minDistance = 4.5;
+
+        // --- 2. LIGHTING ---
+        const ambientLight = new THREE.AmbientLight(0x333335); 
+        scene.add(ambientLight);
+
+        const sunLight = new THREE.DirectionalLight(0xffffff, 1.4); 
+        sunLight.position.set(-100, 20, -50); 
+        scene.add(sunLight);
+
+        // --- 3. EARTH TEXTURE GENERATOR (Procedural Fallback) ---
+        function createProceduralEarthTexture() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 2048; canvas.height = 1024;
+            const ctx = canvas.getContext('2d');
+            
+            ctx.fillStyle = '#112a4a'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = '#285430';
+            function drawLand(p) {
+                ctx.beginPath(); ctx.moveTo(p[0][0], p[0][1]);
+                for (let i = 1; i < p.length; i++) ctx.lineTo(p[i][0], p[i][1]);
+                ctx.closePath(); ctx.fill();
+            }
+            drawLand([[150,150],[450,150],[500,280],[450,350],[380,450],[450,520],[550,520],[650,600],[680,700],[600,850],[520,950],[480,950],[420,700],[380,600],[280,500],[250,400],[180,300]]);
+            drawLand([[950,420],[1050,400],[1140,430],[1200,480],[1220,550],[1160,650],[1120,750],[1080,850],[1040,850],[1000,700],[940,600],[880,550],[880,480],[920,440]]);
+            drawLand([[850,400],[950,400],[1000,350],[1000,250],[900,150],[1100,80],[1400,80],[1700,120],[1750,250],[1650,400],[1550,480],[1450,550],[1350,520],[1280,420],[1180,440],[1100,470],[1040,460]]);
+            drawLand([[1550,650],[1700,670],[1720,750],[1650,820],[1520,780],[1500,700]]);
+            ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, canvas.width, 80); ctx.fillRect(0, 944, canvas.width, 80);
+            return new THREE.CanvasTexture(canvas);
+        }
+
+        // --- 4. LAYERED EARTH RENDER MODEL ---
+        const EARTH_SCALE_RADIUS = 1.0; 
+        const TRUE_EARTH_RADIUS = 6378; 
+
+        const earthGroup = new THREE.Group();
+        earthGroup.rotation.z = THREE.MathUtils.degToRad(23.44); 
+        scene.add(earthGroup);
+
+        const earthGeo = new THREE.SphereGeometry(EARTH_SCALE_RADIUS, 64, 64);
+        const earthMat = new THREE.MeshPhongMaterial({ shininess: 25 });
+        const earthMesh = new THREE.Mesh(earthGeo, earthMat);
+        earthGroup.add(earthMesh);
+
+        const textureLoader = new THREE.TextureLoader();
+        textureLoader.setCrossOrigin("anonymous");
+        const urlEarthMap = "https://raw.githubusercontent.com/mrdoob/three.js/dev/examples/textures/planets/earth_atmos_2048.jpg";
+        
+        textureLoader.load(urlEarthMap, 
+            function(texture) { earthMat.map = texture; earthMat.needsUpdate = true; },
+            undefined,
+            function(err) { earthMat.map = createProceduralEarthTexture(); earthMat.needsUpdate = true; }
+        );
+
+        // Cloud Layer
+        const cloudGeo = new THREE.SphereGeometry(EARTH_SCALE_RADIUS * 1.015, 64, 64);
+        const cloudMat = new THREE.MeshPhongMaterial({
+            transparent: true,
+            opacity: 0.4
+        });
+        const cloudMesh = new THREE.Mesh(cloudGeo, cloudMat);
+        earthGroup.add(cloudMesh);
+        
+        const urlClouds = "https://raw.githubusercontent.com/mrdoob/three.js/dev/examples/textures/planets/earth_clouds_1024.png";
+        textureLoader.load(urlClouds, function(tex) { cloudMat.map = tex; cloudMat.needsUpdate = true; });
+
+        // --- 5. DEEP COSMOS STARFIELD ---
+        const starsGeometry = new THREE.BufferGeometry();
+        const starsCount = 3000;
+        const starPositions = new Float32Array(starsCount * 3);
+        for(let i = 0; i < starsCount * 3; i += 3) {
+            const u = Math.random(); const v = Math.random();
+            const theta = u * 2.0 * Math.PI; const phi = Math.acos(2.0 * v - 1.0);
+            const r = 500 + Math.random() * 200; 
+            starPositions[i] = r * Math.sin(phi) * Math.cos(theta);
+            starPositions[i+1] = r * Math.sin(phi) * Math.sin(theta);
+            starPositions[i+2] = r * Math.cos(phi);
+        }
+        starsGeometry.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
+        const starsMaterial = new THREE.PointsMaterial({ color: 0xffffff, size: 0.45, transparent: true, opacity: 0.8 });
+        scene.add(new THREE.Points(starsGeometry, starsMaterial));
+
+        // --- 6. ORBITAL TELEMETRY DATASET ---
+        const EARTH_PERIOD_SECONDS = 86164.1; 
+        const EARTH_OMEGA = (2 * Math.PI) / EARTH_PERIOD_SECONDS;
+
+        // FIXED: Near Earth Surface altitude pushed slightly up to clear the cloud layer rendering boundary
+        const satelliteData = [
+            { name: "Near Earth Surface", r: 6928,  h: "550",   v: 7.91, periodStr: "84.49 min", periodSec: 84.49 * 60,    color: 0xff4444 },
+            { name: "ISS (Space Station)",r: 7200,  h: "820",   v: 7.67, periodStr: "92.57 min", periodSec: 92.57 * 60,    color: 0xffaa00 },
+            { name: "Remote Sensing (EO)",r: 7800,  h: "1420",  v: 7.34, periodStr: "105.6 min", periodSec: 105.6 * 60,    color: 0xeeee22 },
+            { name: "TOPEX/POSEIDON",     r: 8330,  h: "1950",  v: 7.18, periodStr: "112.9 min", periodSec: 112.9 * 60,    color: 0x22ff22 },
+            { name: "PAGEOS",     r: 11000, h: "4620",  v: 6.31, periodStr: "165.6 min", periodSec: 165.6 * 60,    color: 0x00ffff },
+            { name: "LAGEOS",    r: 13500, h: "7120",  v: 5.69, periodStr: "226.2 min", periodSec: 226.2 * 60,    color: 0x3366ff },
+            { name: "GPS",  r: 26600, h: "20200", v: 3.87, periodStr: "12 h 00m",  periodSec: 12 * 3600,     color: 0xaa33ff },
+            { name: "GEO (Geostationary)",r: 42160, h: "35790", v: 3.07, periodStr: "23h 56m",   periodSec: 86164,         color: 0xff00ff },
+            { name: "Moon",  r: 384400,h: "378000",v: 1.02, periodStr: "27d 08h",   periodSec: 2360600,        color: 0xffffff, isMoon: true }
+        ];
+
+        const satelliteMeshes = [];
+        const orbitLines = [];
+        const interactableObjects = [];
+
+        function getVisualRadius(trueRadius, isMoon) {
+            if (isMoon) return 55.0; 
+            return (trueRadius / TRUE_EARTH_RADIUS) * EARTH_SCALE_RADIUS;
+        }
+
+        // --- 7. OBJECT CONFIGURATION LOOP ---
+        satelliteData.forEach((data) => {
+            const visualRadius = getVisualRadius(data.r, data.isMoon);
+
+            // Orbit Lines
+            const orbitGeo = new THREE.BufferGeometry();
+            const points = [];
+            for(let i = 0; i <= 160; i++) {
+                const theta = (i / 160) * Math.PI * 2;
+                points.push(new THREE.Vector3(Math.cos(theta) * visualRadius, 0, Math.sin(theta) * visualRadius));
+            }
+            orbitGeo.setFromPoints(points);
+            const orbitMat = new THREE.LineBasicMaterial({ color: data.color, transparent: true, opacity: 0.2 });
+            const orbitLine = new THREE.Line(orbitGeo, orbitMat);
+            scene.add(orbitLine);
+            orbitLines.push(orbitLine);
+
+            // Visible Satellite Dot (Slightly smaller mesh size for extreme elegance)
+            const satSize = data.isMoon ? 0.25 : 0.055; 
+            const satGeo = new THREE.SphereGeometry(satSize, 16, 16);
+            const satMat = new THREE.MeshBasicMaterial({ color: data.color });
+            const satMesh = new THREE.Mesh(satGeo, satMat);
+            
+            // Scaled compact hitbox to ensure no physical collision conflicts near LEO
+            const hitboxSize = data.isMoon ? 0.6 : 0.16; 
+            const hitboxGeo = new THREE.SphereGeometry(hitboxSize, 8, 8);
+            const hitboxMat = new THREE.MeshBasicMaterial({ visible: false }); 
+            const hitboxMesh = new THREE.Mesh(hitboxGeo, hitboxMat);
+            
+            satMesh.add(hitboxMesh); 
+            
+            data.omega = (2 * Math.PI) / data.periodSec;
+            satMesh.userData = data;
+            satMesh.userData.currentAngle = Math.random() * Math.PI * 2; 
+            
+            scene.add(satMesh);
+            satelliteMeshes.push(satMesh);
+            interactableObjects.push(hitboxMesh); 
+        });
+
+        // --- 8. LASER LINE SYSTEM ---
+        const laserLineGeo = new THREE.BufferGeometry();
+        const laserPositions = new Float32Array(6); 
+        laserLineGeo.setAttribute('position', new THREE.BufferAttribute(laserPositions, 3));
+        const laserLineMat = new THREE.LineBasicMaterial({ color: 0x00ffff, transparent: true, opacity: 0, lineWidth: 2 });
+        const laserLine = new THREE.Line(laserLineGeo, laserLineMat);
+        scene.add(laserLine);
+
+        // --- 9. RAYCASTING & INTERACTION ---
+        const raycaster = new THREE.Raycaster();
+        raycaster.params.Mesh.threshold = 0.05; 
+        const mouse = new THREE.Vector2();
+        
+        const tooltip = document.getElementById('tooltip');
+        const slider = document.getElementById('timeScaleSlider');
+        const speedIndicator = document.getElementById('speed-indicator');
+
+        window.addEventListener('mousemove', (event) => {
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+            tooltip.style.left = (event.clientX + 20) + 'px';
+            tooltip.style.top = (event.clientY + 20) + 'px';
+        });
+
+        slider.addEventListener('input', () => {
+            speedIndicator.innerText = `Warp Speed: ${slider.value}x real-time`;
+        });
+
+        function performLaserTelemetry() {
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(interactableObjects);
+
+            if (intersects.length > 0) {
+                const hitbox = intersects[0].object;
+                const targetSat = hitbox.parent; 
+                const data = targetSat.userData;
+                
+                const trackingIdx = satelliteMeshes.indexOf(targetSat);
+                
+                orbitLines.forEach((line, idx) => {
+                    line.material.opacity = (idx === trackingIdx) ? 0.9 : 0.08;
+                });
+
+                document.getElementById('meta-name').innerText = data.name;
+                document.getElementById('meta-radius').innerText = data.r.toLocaleString() + " km";
+                document.getElementById('meta-altitude').innerText = data.h.toLocaleString() + " km";
+                document.getElementById('meta-velocity').innerText = data.v + " km/s";
+                document.getElementById('meta-period').innerText = data.periodStr;
+                tooltip.style.display = 'block';
+
+                const pos = laserLine.geometry.attributes.position.array;
+                pos[0] = targetSat.position.x;
+                pos[1] = targetSat.position.y;
+                pos[2] = targetSat.position.z;
+                pos[3] = 0; pos[4] = 0; pos[5] = 0; 
+                laserLine.geometry.attributes.position.needsUpdate = true;
+                laserLine.material.color.setHex(data.color);
+                laserLine.material.opacity = 1.0;
+
+            } else {
+                orbitLines.forEach(line => line.material.opacity = 0.2);
+                tooltip.style.display = 'none';
+                laserLine.material.opacity = 0; 
+            }
+        }
+
+        // --- 10. TIME SCROLL INTERPOLATION LOOP ---
+        const clock = new THREE.Clock();
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const delta = clock.getDelta();
+            const timeScale = parseFloat(slider.value);
+
+            earthMesh.rotation.y += EARTH_OMEGA * delta * timeScale;
+            cloudMesh.rotation.y += (EARTH_OMEGA * 1.06) * delta * timeScale;
+
+            satelliteMeshes.forEach((sat) => {
+                sat.userData.currentAngle += sat.userData.omega * delta * timeScale;
+                const visualRadius = getVisualRadius(sat.userData.r, sat.userData.isMoon);
+                
+                sat.position.x = Math.cos(sat.userData.currentAngle) * visualRadius;
+                sat.position.z = Math.sin(sat.userData.currentAngle) * visualRadius;
+            });
+
+            performLaserTelemetry();
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        animate();
+    </script>
+</body>
+</html>
