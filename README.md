@@ -46,7 +46,4 @@ The orbital parameters used in this simulation are based on **Table 3.6** from t
 | 42,160 | 35,790 | 3.07 | 23 h 56 min | Geostationary satellite |
 | 384,400 | — | 1.02 | 27 d 8 h | Moon |
 
-##  How to Run Locally
-1. Clone this repository:
-   ```bash
-   git clone [https://github.com/Mobinravan/Geodetic-Satellite-Simulation.git](https://github.com/Mobinravan/Geodetic-Satellite-Simulation.git)
+
